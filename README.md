@@ -9,7 +9,7 @@ This is a fork of Svelte's project template to enable usage of Tailwindcss. Refe
 To create a new project based on this template using [degit](https://github.com/Rich-Harris/degit):
 
 ```bash
-npx degit sarioglu/svelte-tailwindcss-template svelte-app
+npx degit yuan-kuan/fp-tailwindcss-svelte-template svelte-app
 cd svelte-app
 ```
 
