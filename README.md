@@ -4,7 +4,9 @@ _Looking for a shareable component template? Go here --> [sveltejs/component-tem
 
 # FP-tailwindcss-svelte-template
 
-This is a fork of Svelte's project template to enable usage of Tailwindcss. Refer to https://github.com/sveltejs/template for more info.
+This is a fork of Svelte's project template to enable usage of Functional Programming and Tailwindcss.
+
+To learn more about the functional programming part, check out this demo project: [ZASA](https://github.com/yuan-kuan/zasa).
 
 To create a new project based on this template using [degit](https://github.com/Rich-Harris/degit):
 
@@ -54,50 +56,4 @@ If you're building a single-page app (SPA) with multiple routes, sirv needs to b
 
 ```js
 "start": "sirv public --single"
-```
-
-## Using TypeScript
-
-This template comes with a script to set up a TypeScript development environment, you can run it immediately after cloning the template with:
-
-```bash
-node scripts/setupTypeScript.js
-```
-
-Or remove the script via:
-
-```bash
-rm scripts/setupTypeScript.js
-```
-
-## Deploying to the web
-
-### With [Vercel](https://vercel.com)
-
-Install `vercel` if you haven't already:
-
-```bash
-npm install -g vercel
-```
-
-Then, from within your project folder:
-
-```bash
-cd public
-vercel deploy --name my-project
-```
-
-### With [surge](https://surge.sh/)
-
-Install `surge` if you haven't already:
-
-```bash
-npm install -g surge
-```
-
-Then, from within your project folder:
-
-```bash
-npm run build
-surge public my-project.surge.sh
 ```
