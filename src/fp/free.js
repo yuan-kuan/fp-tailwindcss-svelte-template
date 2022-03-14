@@ -4,13 +4,41 @@ import daggy from 'daggy';
 import * as fluture from 'fluture';
 import * as R from 'ramda';
 
-import { registerStaticInterpretor } from './sop';
 
-const FreeMonad = daggy.taggedSum('FreeMonad', {
+/**
+ * @typedef {object} FreeMonadType
+ * @property {function(function): FreeMonadType=} map
+ * @property {function(FreeMonadType): FreeMonadType=} ap
+ * @property {function(function): FreeMonadType=} chain
+ * @property {function(function): FreeMonadType=} call
+ * @preperty {function} Pure
+ * @preperty {function} Impure
+*/
+
+const FreeMonad = daggy.taggedSum(
+  'FreeMonad', {
   Impure: ['x', 'f'],
   Pure: ['x'],
 });
 
+// @ts-ignore
+const {Pure, Impure} = FreeMonad;
+
+/**
+ * @function
+ * @param {any} a
+ * @returns {FreeMonadType} a Free Monad
+*/
+const of = (a) => Pure(a); // FreeMonad.of
+
+/**
+ * @function
+ * @param {any} command kind SumType
+ * @returns {FreeMonadType} a Free Monad
+*/
+const lift = (command) => Impure(command, Pure);
+
+// @ts-ignore internal used
 const kleisli_comp = (f, g) => (x) => f(x).chain(g);
 
 FreeMonad.prototype.fold = function () {
@@ -19,21 +47,21 @@ FreeMonad.prototype.fold = function () {
 
 FreeMonad.prototype.map = function (f) {
   return this.cata({
-    Impure: (x, g) => FreeMonad.Impure(x, (y) => g(y).map(f)),
-    Pure: (x) => FreeMonad.Pure(f(x)),
+    Impure: (x, g) => Impure(x, (y) => g(y).map(f)),
+    Pure: (x) => Pure(f(x)),
   });
 };
 
 FreeMonad.prototype.ap = function (a) {
   return this.cata({
-    Impure: (x, g) => FreeMonad.Impure(x, (y) => g(y).ap(a)),
+    Impure: (x, g) => Impure(x, (y) => g(y).ap(a)),
     Pure: (f) => a.map(f),
   });
 };
 
 FreeMonad.prototype.chain = function (f) {
   return this.cata({
-    Impure: (x, g) => FreeMonad.Impure(x, kleisli_comp(g, f)),
+    Impure: (x, g) => Impure(x, kleisli_comp(g, f)),
     Pure: (x) => f(x),
   });
 };
@@ -44,9 +72,6 @@ FreeMonad.prototype.chain = function (f) {
 FreeMonad.prototype.call = function (f) {
   return f(this);
 };
-
-const of = FreeMonad.Pure; // FreeMonad.of
-const lift = (command) => FreeMonad.Impure(command, FreeMonad.Pure);
 
 FreeMonad.prototype.foldMap = function (interpreter, of) {
   return this.cata({
@@ -60,6 +85,8 @@ FreeMonad.prototype.foldMap = function (interpreter, of) {
           interpreted
         );
       } else {
+        console.assert(typeof interpreted === 'function', `Bad interpreted ${interpreted}`);
+
         let future = interpreted(interpreter, of);
         return fluture.chain((result) => next(result).foldMap(interpreter, of))(
           future
@@ -72,17 +99,20 @@ FreeMonad.prototype.foldMap = function (interpreter, of) {
 
 const MAX_THREAD = 8;
 
-const FutureCommand = daggy.taggedSum('FutureCommand', {
+const FreeUtils = daggy.taggedSum('FutureCommand', {
   Bichain: ['left', 'right', 'freeMonad'],
   Bimap: ['left', 'right', 'freeMonad'],
   Parallel: ['freeMonads'],
+  Left: ['value'],
+  Right: ['value'],
 });
-const { Bichain, Bimap, Parallel } = FutureCommand;
+// @ts-ignore
+const { Bichain, Bimap, Parallel, Left, Right } = FreeUtils;
 
 // This interpretor return a function that expect `interpreter` and `of`, when
 // called with the arguments (which usually pass in by caller `foldMap`), this
 // will return a Future.
-const futureCommandToFuture = (p) =>
+const freeUtilsToFuture = (p) =>
   p.cata({
     Bichain: (left, right, freeMonad) => (interpreter, of) =>
       fluture.bichain((result) => left(result).foldMap(interpreter, of))(
@@ -90,7 +120,7 @@ const futureCommandToFuture = (p) =>
       )(freeMonad.foldMap(interpreter, of)),
 
     Bimap: (left, right, freeMonad) => (interpreter, of) =>
-      fluture.bimap(left)(right)(freeMonad.foldMap(interpreter, of)),
+      fluture.coalesce(left)(right)(freeMonad.foldMap(interpreter, of)),
 
     Parallel: (freeMonads) => (interpreter, of) => {
       // Interpret each free monads in the array
@@ -99,27 +129,43 @@ const futureCommandToFuture = (p) =>
       // Run all interpreted Future with parallel
       return fluture.parallel(MAX_THREAD)(futures);
     },
+
+    Left: fluture.reject,
+    Right: fluture.resolve,
   });
 
-const futureCommandInterpretor = [FutureCommand, futureCommandToFuture];
-registerStaticInterpretor(futureCommandInterpretor);
 
 // [Free(Future)] -> Free(Future)
 // This take in an array of free monads (which must interprete into Future).
 // All interpreted Futures will run by Fluture's parallel command.
 // See also: https://github.com/fluture-js/Fluture#parallel
+
+/**
+ * @function
+ * @param {FreeMonadType[]} freeMonads
+ * @returns FreeMonadType
+*/
 const parallel = (freeMonads) => lift(Parallel(freeMonads));
+// @ts-ignore seqence wasn't typed by Ramda
 const parallelConverge = R.converge((...freeMonads) => parallel(freeMonads));
-const sequence = R.sequence(of);
+
+/**
+ * @function
+ * @param {FreeMonadType[]} freeMonads
+ * @returns FreeMonadType
+*/
+// @ts-ignore seqence wasn't typed by Ramda
+const sequence = (freeMonads) => R.sequence(of, freeMonads);
 
 // Function -> Function -> Free(Future) -> Free(Future)
 // Map the result over `left` function if the outcome from forking freeMonad
 // being rejected. Map over `right` when resolved.
 //
-// Outcome of the future will remain the same after the mapped function. i.e.
-// rejection will remain a rejected future.
+// Outcome of the future will become resolution as internally we use fluture's
+// coalesce instead of bimap.
 //
 // See also: https://github.com/fluture-js/Fluture#bimap
+// See also: https://github.com/fluture-js/Fluture#coalesce
 const bimap = R.curry((left, right, freeMonad) =>
   lift(Bimap(left, right, freeMonad))
 );
@@ -137,9 +183,13 @@ const bichain = R.curry((left, right, freeMonad) =>
   lift(Bichain(left, right, freeMonad))
 );
 
+const left = (v) => lift(Left(v))
+const right = (v) => lift(Right(v));
+
 const interpete = (freeMonad) => (interpreter, of) =>
   freeMonad.foldMap(interpreter, of);
 
+export const freeUtilsInterpretor = [FreeUtils, freeUtilsToFuture];
 export {
   lift,
   of,
@@ -148,6 +198,7 @@ export {
   sequence,
   bimap,
   bichain,
+  left,
+  right,
   interpete,
-  futureCommandInterpretor,
 };

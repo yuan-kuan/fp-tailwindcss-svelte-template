@@ -4,7 +4,7 @@ import { Future, resolve } from 'fluture';
 import * as R from 'ramda';
 import { writable } from 'svelte/store';
 
-import * as free from './free_monad';
+import * as free from './free';
 import { registerDerefInterpretor } from './sop';
 
 const createRef = (defaultValue) => {
@@ -76,17 +76,35 @@ const createRef = (defaultValue) => {
 function createArrayRef() {
   const {
     subscribe,
-    refset,
+    refset: originalRefset,
     reset: originalReset,
     verifyOwnership,
     changeOwner,
   } = createRef([]);
 
   let data = [];
+
+  const refset = (sopId, value) => {
+    if (verifyOwnership(sopId)) {
+      data = value;
+      console.log('set array to ', data);
+      originalRefset(sopId, data);
+    } 
+  }
+
+  const append = (sopId, value) => {
+    if (verifyOwnership(sopId)) {
+      console.log(`adding ${value} to ${data}`);
+      data = data.concat(value);
+      console.log('added ', value);
+      originalRefset(sopId, data);
+    }
+  }
+
   function update(sopId, index, value) {
     if (verifyOwnership(sopId)) {
       data[index] = value;
-      refset(sopId, data);
+      originalRefset(sopId, data);
     }
   }
 
@@ -99,6 +117,8 @@ function createArrayRef() {
 
   return {
     subscribe,
+    refset,
+    append,
     update,
     reset,
     changeOwner,
@@ -111,8 +131,10 @@ const Ref = daggy.taggedSum('Ref', {
   Reset: ['ref'],
   Set: ['ref', 'value'],
   Update: ['ref', 'key', 'value'],
+  Append: ['ref', 'value']
 });
-const { Deref, Get, Set, Reset, Update } = Ref;
+// @ts-ignore
+const { Deref, Get, Set, Reset, Update, Append } = Ref;
 
 const refToFuture = (deref) => (p) =>
   p.cata({
@@ -125,7 +147,7 @@ const refToFuture = (deref) => (p) =>
           reject(error);
         }
 
-        return () => {};
+        return () => { };
       }),
     Set: (ref, value) =>
       Future((_, resolve) => {
@@ -133,21 +155,28 @@ const refToFuture = (deref) => (p) =>
         deref(ref).set(value);
         resolve();
 
-        return () => {};
+        return () => { };
       }),
     Reset: (ref) =>
       Future((_, resolve) => {
         deref(ref).reset();
         resolve();
 
-        return () => {};
+        return () => { };
       }),
     Update: (ref, key, value) =>
       Future((_, resolve) => {
         deref(ref).update(key, value);
         resolve();
 
-        return () => {};
+        return () => { };
+      }),
+    Append: (ref, value) =>
+      Future((_, resolve) => {
+        deref(ref).append(value);
+        resolve();
+
+        return () => { };
       }),
   });
 
@@ -161,6 +190,7 @@ const setRef = R.curry((ref, value) => free.lift(Set(ref, value)));
 const updateRef = R.curry((ref, index, value) =>
   free.lift(Update(ref, index, value))
 );
+const appendRef = R.curry((ref, value) => free.lift(Append(ref, value)));
 const resetRef = (ref) => free.lift(Reset(ref));
 
 export {
@@ -171,5 +201,6 @@ export {
   getRef,
   setRef,
   updateRef,
+  appendRef,
   resetRef,
 };

@@ -1,8 +1,12 @@
-import App from './view/App.svelte';
-import Sample from './view/Sample.svelte';
+import App from './App.svelte';
+import Sample from './Sample.svelte';
 
-import { addSop } from './sop';
+import { freeUtilsInterpretor } from './fp/free'; 
+import { addSop, registerStaticInterpretor} from './fp/sop';
 import { viewMainPage } from './view';
+
+// Use Free Utils
+registerStaticInterpretor(freeUtilsInterpretor);
 
 addSop(() => viewMainPage(Sample));
 
