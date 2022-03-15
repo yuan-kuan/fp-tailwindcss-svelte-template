@@ -77,3 +77,42 @@ test('Reset array', async () => {
 
   expect(fn.mock.calls[4][0]).toEqual(['e', 'f']);
 });
+
+test('Update array by the index', async () => {
+  const arrayStore = ref.createArrayRef();
+  const fn = jest.fn();
+  arrayStore.subscribe(fn);
+
+  const fm = free.sequence([
+    ref.setRef(arrayStore, ['a', 'b']),
+    ref.updateRef(arrayStore, 1, 'c' )
+  ]);
+  await  interpret(fm);
+
+  expect(fn.mock.calls[2][0]).toEqual(['a', 'c']);
+});
+
+test('Manipulating Array does nothing to prior setRef', async () => {
+  const arrayStore = ref.createArrayRef();
+  const fn = jest.fn(n => n.push('x'));
+  arrayStore.subscribe(fn);
+
+  let arr = ['a', 'b'];
+  const fm = free.sequence([
+    ref.setRef(arrayStore, arr).map((_) => arr.push('z')),
+    ref.appendRef(arrayStore, ['c', 'd']),
+  ]);
+  await  interpret(fm);
+
+  expect(fn.mock.calls[2][0]).toEqual(['a', 'b', 'c', 'd']);
+});
+
+test('setRef a non-array should throw', async () => {
+  const arrayStore = ref.createArrayRef();
+  const fn = jest.fn();
+  arrayStore.subscribe(fn);
+
+  const fm = ref.setRef(arrayStore, {'type':'non-array'});
+
+  expect(interpret(fm)).rejects.toEqual(Error('createArrayRef only accept Array')); 
+});

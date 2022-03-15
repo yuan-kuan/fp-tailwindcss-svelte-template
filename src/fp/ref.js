@@ -86,9 +86,13 @@ function createArrayRef() {
 
   const refset = (sopId, value) => {
     if (verifyOwnership(sopId)) {
-      data = value;
-      console.log('set array to ', data);
-      originalRefset(sopId, data);
+      if (!Array.isArray(value)) {
+        throw new Error('createArrayRef only accept Array');
+      } else {
+        data = value;
+        console.log('set array to ', data);
+        originalRefset(sopId, data);
+      }
     } 
   }
 
@@ -150,32 +154,47 @@ const refToFuture = (deref) => (p) =>
         return () => { };
       }),
     Set: (ref, value) =>
-      Future((_, resolve) => {
-        // console.log('setting ', value);
-        deref(ref).set(value);
-        resolve();
-
+      Future((reject, resolve) => {
+        try {
+          // console.log('setting ', value);
+          deref(ref).set(value);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
         return () => { };
       }),
     Reset: (ref) =>
-      Future((_, resolve) => {
+      Future((reject, resolve) => {
+        try {
         deref(ref).reset();
         resolve();
 
+        } catch (error) {
+          reject(error);
+        }
         return () => { };
       }),
     Update: (ref, key, value) =>
-      Future((_, resolve) => {
+      Future((reject, resolve) => {
+        try {
         deref(ref).update(key, value);
         resolve();
 
+        } catch (error) {
+          reject(error);
+        }
         return () => { };
       }),
     Append: (ref, value) =>
-      Future((_, resolve) => {
+      Future((reject, resolve) => {
+        try {
         deref(ref).append(value);
         resolve();
 
+        } catch (error) {
+          reject(error);
+        }
         return () => { };
       }),
   });
