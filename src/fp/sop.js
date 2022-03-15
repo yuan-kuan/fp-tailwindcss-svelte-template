@@ -17,6 +17,7 @@ const getDeref = (sopId) => {
       set: (v) => s.refset(sopId, v),
       reset: () => s.reset(sopId),
       update: (k, v) => s.update(sopId, k, v),
+      append: (v) => s.append(sopId, v),
     };
   };
 };
