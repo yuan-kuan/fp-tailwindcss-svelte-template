@@ -94,7 +94,7 @@ test('Update array by the index', async () => {
 
 test('Manipulating Array does nothing to prior setRef', async () => {
   const arrayStore = ref.createArrayRef();
-  const fn = jest.fn(n => n.push('x'));
+  const fn = jest.fn();
   arrayStore.subscribe(fn);
 
   let arr = ['a', 'b'];
@@ -105,6 +105,26 @@ test('Manipulating Array does nothing to prior setRef', async () => {
   await  interpret(fm);
 
   expect(fn.mock.calls[2][0]).toEqual(['a', 'b', 'c', 'd']);
+});
+
+test('Manipulating Array result does nothing too', (done) => {
+  const arrayStore = ref.createArrayRef();
+  arrayStore.subscribe(v => {
+    if (v.length == 0) {
+      //first time
+      v.push('x');
+    } else {
+      //second time
+      expect(v).toEqual(['a', 'b']);
+      done();
+    }
+  });
+
+  let arr = ['a', 'b'];
+  const fm = free.sequence([
+    ref.setRef(arrayStore, arr),
+  ]);
+  interpret(fm);
 });
 
 test('setRef a non-array should throw', async () => {

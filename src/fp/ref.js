@@ -53,7 +53,6 @@ const createRef = (defaultValue) => {
   }
 
   const refget = (sopId) => {
-    console.log('ref geting iwht ' + sopId);
     if (verifyOwnership(sopId)) {
       return hotValue;
     } else {
@@ -89,33 +88,30 @@ function createArrayRef() {
       if (!Array.isArray(value)) {
         throw new Error('createArrayRef only accept Array');
       } else {
-        data = value;
-        console.log('set array to ', data);
-        originalRefset(sopId, data);
+        data = R.clone(value);
+        originalRefset(sopId, R.clone(data));
       }
     } 
   }
 
   const append = (sopId, value) => {
     if (verifyOwnership(sopId)) {
-      console.log(`adding ${value} to ${data}`);
       data = data.concat(value);
-      console.log('added ', value);
-      originalRefset(sopId, data);
+      originalRefset(sopId, R.clone(data));
     }
   }
 
   function update(sopId, index, value) {
     if (verifyOwnership(sopId)) {
       data[index] = value;
-      originalRefset(sopId, data);
+      originalRefset(sopId, R.clone(data));
     }
   }
 
   const reset = (sopId) => {
     if (verifyOwnership(sopId)) {
       data = [];
-      originalReset(sopId);
+      originalRefset(sopId, R.clone(data));
     }
   };
 
